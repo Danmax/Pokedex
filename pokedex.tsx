@@ -2,6 +2,12 @@ import React, { useState, useEffect, useCallback } from "react";
 
 const TYPE_COLORS: Record<string, string> = {normal:"#A8A878",fire:"#F08030",water:"#6890F0",electric:"#F8D030",grass:"#78C850",ice:"#98D8D8",fighting:"#C03028",poison:"#A040A0",ground:"#E0C068",flying:"#A890F0",psychic:"#F85888",bug:"#A8B820",rock:"#B8A038",ghost:"#705898",dragon:"#7038F8",dark:"#705848",steel:"#B8B8D0",fairy:"#EE99AC"};
 const STAT_COLORS: Record<string, string> = {hp:"#FF5959",atk:"#F5AC78",def:"#FAE078",spa:"#9DB7F5",spd:"#A7DB8D",spe:"#FA92B2"};
+const COLOR_TEMPLATES: Record<string, { label: string; color: string; lightText: boolean }> = {
+  "classic-red": { label: "Classic Red", color: "#e53935", lightText: true },
+  "classic-blue": { label: "Classic Blue", color: "#1e88e5", lightText: true },
+  "classic-green": { label: "Classic Green", color: "#43a047", lightText: true },
+  "classic-yellow": { label: "Classic Yellow", color: "#fdd835", lightText: false },
+};
 
 const SPRITE = (id: number | string, shiny: boolean = false): string =>
   `https://img.pokemondb.net/sprites/${shiny ? "sword-shield/normal-shiny" : "sword-shield/normal"}/${BY_NAME[id] || "bulbasaur"}.png`;
@@ -513,6 +519,7 @@ const Pokedex: React.FC<PokedexProps> = ({ userName, onRename }) => {
   const [search, setSearch] = useState("");
   const [showList, setShowList] = useState(false);
   const [listSearch, setListSearch] = useState("");
+  const [themeId, setThemeId] = useStorage<string>("pokedex_theme_template", "classic-red");
 
   const p = POKEMON[id];
   const chainIds = CHAINS[p.chain] || [];
@@ -537,25 +544,45 @@ const Pokedex: React.FC<PokedexProps> = ({ userName, onRename }) => {
     !listSearch || x.name.includes(listSearch.toLowerCase()) || String(x.id).includes(listSearch)
   );
 
-  const bgColor = TYPE_COLORS[p.types[0]] || "#e53935";
+  const theme = COLOR_TEMPLATES[themeId] || COLOR_TEMPLATES["classic-red"];
+  const bgColor = theme.color;
+  const themeText = theme.lightText ? "#fff" : "#222";
+  const themeSubText = theme.lightText ? "rgba(255,255,255,.85)" : "rgba(0,0,0,.72)";
+  const glassBg = theme.lightText ? "rgba(255,255,255,.2)" : "rgba(0,0,0,.08)";
+  const glassBorder = theme.lightText ? "1px solid rgba(255,255,255,.4)" : "1px solid rgba(0,0,0,.2)";
 
   return (
     <div style={{minHeight:"100vh",background:"#f2f2f2",fontFamily:"'Segoe UI',system-ui,sans-serif"}}>
       {/* Header */}
       <div style={{background:`linear-gradient(90deg,${bgColor},${bgColor}cc)`,padding:"12px 20px",display:"flex",alignItems:"center",gap:12,transition:"background .4s",boxShadow:"0 2px 12px rgba(0,0,0,.15)"}}>
-        <span style={{color:"#fff",fontWeight:"bold",fontSize:20,letterSpacing:2,flex:1}}>POKéDEX</span>
-        <span style={{color:"rgba(255,255,255,.85)",fontSize:12}}>TRAINER: <strong style={{color:"#fff"}}>{userName}</strong></span>
-        <button onClick={onRename} style={{background:"rgba(255,255,255,.2)",border:"1px solid rgba(255,255,255,.4)",color:"#fff",fontSize:11,padding:"4px 10px",borderRadius:20,cursor:"pointer"}}>Rename</button>
+        <span style={{color:themeText,fontWeight:"bold",fontSize:20,letterSpacing:2,flex:1}}>POKéDEX</span>
+        <span style={{color:themeSubText,fontSize:12}}>TRAINER: <strong style={{color:themeText}}>{userName}</strong></span>
+        <button onClick={onRename} style={{background:glassBg,border:glassBorder,color:themeText,fontSize:11,padding:"4px 10px",borderRadius:20,cursor:"pointer"}}>Rename</button>
       </div>
 
       <div style={{maxWidth:520,margin:"0 auto",padding:"20px 16px"}}>
+        <div style={{display:"flex",justifyContent:"flex-end",marginBottom:12}}>
+          <label style={{display:"flex",alignItems:"center",gap:8,fontSize:12,color:"#666",fontWeight:"bold",letterSpacing:.4}}>
+            Theme
+            <select
+              value={themeId}
+              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setThemeId(e.target.value)}
+              style={{border:"2px solid #e0e0e0",borderRadius:16,padding:"6px 10px",fontSize:12,fontFamily:"inherit",background:"#fff",color:"#333",outline:"none",cursor:"pointer"}}
+            >
+              {Object.entries(COLOR_TEMPLATES).map(([key, template]) => (
+                <option key={key} value={key}>{template.label}</option>
+              ))}
+            </select>
+          </label>
+        </div>
+
         {/* Search */}
         <form onSubmit={handleSearch} style={{display:"flex",gap:8,marginBottom:14}}>
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search by ID or Name"
             style={{flex:1,border:"2px solid #e0e0e0",borderRadius:30,padding:"10px 18px",fontSize:13,outline:"none",fontFamily:"inherit",background:"#fff"}}
             onFocus={e => e.target.style.borderColor = bgColor}
             onBlur={e => e.target.style.borderColor = "#e0e0e0"} />
-          <button type="submit" style={{background:bgColor,border:"none",color:"#fff",padding:"10px 20px",borderRadius:30,cursor:"pointer",fontWeight:"bold",fontSize:13,transition:"background .4s"}}>Go</button>
+          <button type="submit" style={{background:bgColor,border:"none",color:themeText,padding:"10px 20px",borderRadius:30,cursor:"pointer",fontWeight:"bold",fontSize:13,transition:"background .4s"}}>Go</button>
           <button type="button" onClick={() => setShowList(s => !s)} style={{background:"#fff",border:"2px solid #e0e0e0",color:"#555",padding:"10px 14px",borderRadius:30,cursor:"pointer",fontSize:16}}>☰</button>
         </form>
 
@@ -657,7 +684,7 @@ const Pokedex: React.FC<PokedexProps> = ({ userName, onRename }) => {
 
         <button onClick={() => { setId(Math.ceil(Math.random()*386)); setShiny(false); }}
           style={{width:"100%",marginTop:12,background:`linear-gradient(90deg,${bgColor},${bgColor}bb)`,border:"none",
-            color:"#fff",padding:"14px",borderRadius:16,fontSize:14,fontWeight:"bold",cursor:"pointer",
+            color:themeText,padding:"14px",borderRadius:16,fontSize:14,fontWeight:"bold",cursor:"pointer",
             letterSpacing:1,boxShadow:`0 4px 12px ${bgColor}55`,transition:"background .4s"}}>
           🎲 Pick for me
         </button>
