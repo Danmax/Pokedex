@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "start": "webpack serve --mode development --open",
-    "build": "webpack --mode production"
+    "build": "webpack --mode production && cp index.html dist/index.html"
   },
   "dependencies": {
     "react": "^18.0.0",
