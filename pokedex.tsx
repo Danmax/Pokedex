@@ -10,10 +10,9 @@ const COLOR_TEMPLATES: Record<string, { label: string; color: string; lightText:
 };
 
 const SPRITE = (id: number | string, shiny: boolean = false): string =>
-  `https://img.pokemondb.net/sprites/${shiny ? "sword-shield/normal-shiny" : "sword-shield/normal"}/${BY_NAME[id] || "bulbasaur"}.png`;
+  `https://img.pokemondb.net/sprites/${shiny ? "sword-shield/shiny" : "sword-shield/normal"}/${BY_NAME[id] || "bulbasaur"}.png`;
 const SPRITE_ICON = (id: number | string): string =>
   `https://img.pokemondb.net/sprites/sword-shield/icon/${BY_NAME[id] || "bulbasaur"}.png`;
-const DREAM = (id: number | string): string => SPRITE(id);
 
 const RAW = [
   [1,"Bulbasaur",["grass","poison"],45,49,49,65,65,45,7,69,["overgrow"],1,"A strange seed was planted on its back at birth."],
@@ -421,6 +420,31 @@ BY_ID.forEach((p: any) => {
   CHAINS[p.chain].push(p.id);
 });
 
+// RAW is ordered by National Dex, so later-introduced baby forms can appear last.
+// These overrides force evolution displays into expected chain order.
+const CHAIN_ORDER_OVERRIDES: Record<string, number[]> = {
+  "10": [172, 25, 26],       // Pichu -> Pikachu -> Raichu
+  "14": [173, 35, 36],       // Cleffa -> Clefairy -> Clefable
+  "16": [174, 39, 40],       // Igglybuff -> Jigglypuff -> Wigglytuff
+  "47": [236, 106, 107, 237],// Tyrogue -> Hitmonlee/Hitmonchan/Hitmontop
+  "60": [238, 124],          // Smoochum -> Jynx
+  "61": [239, 125],          // Elekid -> Electabuzz
+  "62": [240, 126],          // Magby -> Magmar
+  "91": [298, 183, 184],     // Azurill -> Marill -> Azumarill
+  "101": [360, 202],         // Wynaut -> Wobbuffet
+};
+
+function getOrderedChain(chain: string | number): number[] {
+  const chainIds = (CHAINS[chain] || []) as number[];
+  const override = CHAIN_ORDER_OVERRIDES[String(chain)];
+  if (!override) return chainIds;
+
+  const existing = new Set(chainIds);
+  const ordered = override.filter((id) => existing.has(id));
+  const remainder = chainIds.filter((id) => !ordered.includes(id));
+  return [...ordered, ...remainder];
+}
+
 function useStorage<T>(key: string, def: T): [T, (v: T) => void] {
   const [val, setVal] = useState<T>(() => {
     try { const s = localStorage.getItem(key); return s ? JSON.parse(s) as T : def; } catch { return def; }
@@ -501,12 +525,20 @@ interface DreamSpriteProps {
   shiny?: boolean;
 }
 const DreamSprite: React.FC<DreamSpriteProps> = ({ id, shiny = false }) => {
-  const [useFallback, setUseFallback] = useState(false);
-  useEffect(() => setUseFallback(false), [id, shiny]);
-  if (shiny || useFallback) {
-    return <img src={SPRITE(id, shiny)} style={{width:128,height:128,objectFit:"contain",imageRendering:"pixelated"}} />;
-  }
-  return <img src={DREAM(id)} onError={() => setUseFallback(true)} style={{width:128,height:128,objectFit:"contain"}} />;
+  const [shinyFallback, setShinyFallback] = useState(false);
+  useEffect(() => setShinyFallback(false), [id, shiny]);
+
+  const useShiny = shiny && !shinyFallback;
+  return (
+    <img
+      src={SPRITE(id, useShiny)}
+      onError={() => {
+        // Some species/forms may miss shiny assets on the source CDN.
+        if (useShiny) setShinyFallback(true);
+      }}
+      style={{width:128,height:128,objectFit:"contain",imageRendering:"pixelated"}}
+    />
+  );
 }
 
 interface PokedexProps {
@@ -522,7 +554,7 @@ const Pokedex: React.FC<PokedexProps> = ({ userName, onRename }) => {
   const [themeId, setThemeId] = useStorage<string>("pokedex_theme_template", "classic-red");
 
   const p = POKEMON[id];
-  const chainIds = CHAINS[p.chain] || [];
+  const chainIds = getOrderedChain(p.chain);
 
   const go = (dir: number) => {
     const nid = Math.min(386, Math.max(1, id + dir));
